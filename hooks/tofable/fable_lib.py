@@ -350,11 +350,11 @@ def command_from_input(input_data: dict[str, Any]) -> str:
         command = tool_input
     else:
         return ""
-    # Strip NUL/control bytes (keep tab/newline/carriage-return) and cap
-    # length so downstream consumers never receive unsanitized, unbounded
-    # command strings derived from untrusted tool_input.
-    command = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", command)
-    return command[:4000]
+    # Strip embedded ASCII control bytes (keep tab/newline/carriage-return)
+    # before downstream parsing/verification consumes this value. Does not
+    # truncate or strip shell metacharacters — callers that persist this
+    # value already limit display/log length via redact().
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", command)
 
 
 def exit_success(input_data: dict[str, Any], text: str) -> bool | None:
