@@ -27,9 +27,11 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -220,10 +222,23 @@ def data_root() -> Path:
     return base.resolve()
 
 
+def _ledger_secret() -> bytes:
+    """Per-installation secret used to make ledger keys unpredictable."""
+    secret_path = data_root() / "ledger.secret"
+    try:
+        return bytes.fromhex(secret_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        secret = secrets.token_bytes(32)
+        secret_path.parent.mkdir(parents=True, exist_ok=True)
+        secret_path.write_text(secret.hex(), encoding="utf-8")
+        return secret
+
+
 def ledger_key(input_data: dict[str, Any]) -> str:
     cwd = input_data.get("cwd") or os.getcwd()
     session_id = input_data.get("session_id") or "no-session"
-    return hashlib.sha256(f"{session_id}|{cwd}".encode("utf-8", "replace")).hexdigest()[:24]
+    message = f"{session_id}|{cwd}".encode("utf-8", "replace")
+    return hmac.new(_ledger_secret(), message, hashlib.sha256).hexdigest()
 
 
 def ledger_path(input_data: dict[str, Any]) -> Path:
